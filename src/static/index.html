@@ -1,0 +1,61 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Project Bazinga | Hero Portal</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-900 text-white p-8">
+    <div class="max-w-4xl mx-auto">
+        <h1 class="text-4xl font-bold text-blue-400 mb-2">Project Bazinga</h1>
+        <p class="text-slate-400 mb-8">AHKSZ-35 Governance Engine powered by Amazon Nova</p>
+        
+        <textarea id="problem" class="w-full h-32 p-4 bg-slate-800 rounded-lg border border-slate-700 mb-4" placeholder="Enter the crisis or 'Golden Ticket' scenario..."></textarea>
+        <button onclick="evaluateProblem()" class="bg-blue-600 hover:bg-blue-500 px-6 py-2 rounded-lg font-bold">Process Through Council</button>
+
+        <div id="results" class="mt-8 grid grid-cols-1 md:grid-cols-2 gap-4 hidden">
+            </div>
+
+        <div id="heroic-decision" class="mt-8 p-6 bg-blue-900/30 border border-blue-500 rounded-lg hidden">
+            <h2 class="text-2xl font-bold text-blue-300 mb-2">The Heroic Decision</h2>
+            <div id="decision-text" class="italic text-lg"></div>
+            <div class="mt-4 bg-slate-700 h-4 w-full rounded-full overflow-hidden">
+                <div id="resilience-bar" class="bg-green-500 h-full transition-all duration-1000" style="width: 0%"></div>
+            </div>
+            <p class="text-xs text-slate-400 mt-1">Heroic Resilience Index: <span id="resilience-text">0</span>/100</p>
+        </div>
+    </div>
+
+    <script>
+        async function evaluateProblem() {
+            const problem = document.getElementById('problem').value;
+            const resDiv = document.getElementById('results');
+            const decisionDiv = document.getElementById('heroic-decision');
+            
+            const response = await fetch('/evaluate', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({problem})
+            });
+            const data = await response.json();
+
+            resDiv.innerHTML = '';
+            resDiv.classList.remove('hidden');
+            decisionDiv.classList.remove('hidden');
+
+            for (const [module, text] of Object.entries(data.modules)) {
+                resDiv.innerHTML += `
+                    <div class="p-4 bg-slate-800 rounded border border-slate-700">
+                        <h3 class="font-bold text-blue-400 uppercase">${module}</h3>
+                        <p class="text-sm text-slate-300">${text}</p>
+                    </div>`;
+            }
+            document.getElementById('decision-text').innerText = data.heroic_decision;
+
+            const score = Math.floor(Math.random() * 40) + 60; // Simulate 60-100 range
+            document.getElementById('resilience-bar').style.width = score + '%';
+            document.getElementById('resilience-text').innerText = score;
+        }
+    </script>
+</body>
+</html>
