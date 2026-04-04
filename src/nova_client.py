@@ -1,9 +1,11 @@
-﻿import boto3
+﻿import os
+import boto3
 from typing import Any, Tuple
 
-DEFAULT_REGION = "us-east-1"
-DEFAULT_MODULE_MODEL = "amazon.nova-lite-v1:0"
-DEFAULT_INTEGRATOR_MODEL = "amazon.nova-pro-v1:0"
+DEFAULT_REGION = os.getenv("BEDROCK_REGION", "us-east-1")
+DEFAULT_MODULE_MODEL = os.getenv("NOVA_MODULE_MODEL_ID", "amazon.nova-lite-v1:0")
+DEFAULT_INTEGRATOR_MODEL = os.getenv("NOVA_INTEGRATOR_MODEL_ID", "amazon.nova-pro-v1:0")
+DEFAULT_MAX_TOKENS = int(os.getenv("NOVA_MAX_TOKENS", "400"))
 
 
 def converse_with_meta(
@@ -12,6 +14,7 @@ def converse_with_meta(
     system_text: str | None = None,
     temperature: float = 0.3,
     region: str = DEFAULT_REGION,
+    max_tokens: int = DEFAULT_MAX_TOKENS,
 ) -> Tuple[str, str, dict[str, Any]]:
     client = boto3.client("bedrock-runtime", region_name=region)
 
@@ -19,7 +22,7 @@ def converse_with_meta(
     kwargs: dict[str, Any] = {
         "modelId": model_id,
         "messages": messages,
-        "inferenceConfig": {"temperature": temperature, "maxTokens": 400},
+        "inferenceConfig": {"temperature": temperature, "maxTokens": max_tokens},
     }
     if system_text:
         kwargs["system"] = [{"text": system_text}]
@@ -35,12 +38,20 @@ def converse_with_meta(
     raise RuntimeError("No text returned from Nova.")
 
 
-def converse_text(model_id: str, user_text: str, system_text: str | None = None, temperature: float = 0.3, region: str = DEFAULT_REGION) -> str:
+def converse_text(
+    model_id: str,
+    user_text: str,
+    system_text: str | None = None,
+    temperature: float = 0.3,
+    region: str = DEFAULT_REGION,
+    max_tokens: int = DEFAULT_MAX_TOKENS,
+) -> str:
     text, _request_id, _response = converse_with_meta(
         model_id=model_id,
         user_text=user_text,
         system_text=system_text,
         temperature=temperature,
         region=region,
+        max_tokens=max_tokens,
     )
     return text
