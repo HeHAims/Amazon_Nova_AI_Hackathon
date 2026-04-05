@@ -8,3 +8,5 @@ static_build/
 .venv/
 .venv-linux/
 logs/
+tmp-*.json
+*.log
