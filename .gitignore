@@ -1,4 +1,10 @@
-.venv/
+﻿node_modules/
+.env
 __pycache__/
 *.pyc
+.DS_Store
+dist/
+static_build/
+.venv/
+.venv-linux/
 logs/

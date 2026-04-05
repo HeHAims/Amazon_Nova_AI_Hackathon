@@ -1,0 +1,50 @@
+name: Deploy Symbiotic Site
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "index.html"
+      - "styles.css"
+      - "benchmarks.html"
+      - "contact.html"
+      - "favicon.svg"
+      - "images/**"
+      - "static/**"
+      - ".github/workflows/deploy-swa.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    name: Deploy to Azure Static Web Apps
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Sync root pages into static folder
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p static/images
+          cp -f index.html static/index.html
+          cp -f styles.css static/styles.css
+          cp -f benchmarks.html static/benchmarks.html
+          cp -f contact.html static/contact.html
+          cp -f favicon.svg static/favicon.svg
+          if [ -d "images" ]; then
+            cp -f images/* static/images/ || true
+          fi
+
+      - name: Deploy static content
+        uses: Azure/static-web-apps-deploy@v1
+        with:
+          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          action: upload
+          app_location: "static"
+          skip_app_build: true

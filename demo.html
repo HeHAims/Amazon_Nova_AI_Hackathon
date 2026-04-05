@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="description" content="CMIS contract-accurate demo for /generate and /govern endpoints." />
+<title>CMIS API Demo | Contract-Accurate</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml" />
+<link rel="stylesheet" href="styles.css" />
+<style>
+.demo-shell {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+}
+.demo-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+}
+.demo-card {
+  background: rgba(8, 14, 18, 0.82);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1rem;
+}
+.demo-card h3 {
+  margin-top: 0;
+  color: var(--accent);
+}
+textarea.demo-input,
+select.demo-select {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: rgba(6, 10, 14, 0.8);
+  color: var(--text);
+  padding: 0.75rem;
+  font: inherit;
+}
+.demo-actions {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-top: 0.75rem;
+}
+.button-secondary {
+  color: var(--text);
+  background: transparent;
+}
+.output {
+  white-space: pre-wrap;
+  font-family: Consolas, "Courier New", monospace;
+  font-size: 0.86rem;
+  line-height: 1.5;
+  min-height: 230px;
+  color: #b9d7e0;
+}
+.status-pill {
+  display: inline-block;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.2rem 0.65rem;
+  font-size: 0.82rem;
+}
+.allow { color: #7dff9e; border-color: #2f7a44; }
+.refuse { color: #ff8a8a; border-color: #7a3030; }
+.hint {
+  color: var(--muted);
+  font-size: 0.86rem;
+}
+@media (max-width: 960px) {
+  .demo-grid {
+    grid-template-columns: 1fr;
+  }
+}
+</style>
+</head>
+<body>
+<header>
+  <h1>SYMBIOTIC AI</h1>
+  <p class="tagline">CMIS Contract-Accurate Demo</p>
+  <nav aria-label="Primary">
+    <a href="index.html">Home</a>
+    <a href="demo-live.html">Live Demo UI</a>
+    <a href="about.html">About</a>
+    <a href="technology.html">Technology</a>
+    <a href="contact.html">Contact</a>
+  </nav>
+</header>
+
+<main>
+<section class="demo-shell">
+  <h2>Demo 1: Backend-Truth Test Harness</h2>
+  <p class="hint">This page uses only fields your backend actually returns today. No synthetic fields are invented.</p>
+  <div class="demo-card">
+    <label for="endpoint">Endpoint</label>
+    <select id="endpoint" class="demo-select" aria-label="Endpoint selector">
+      <option value="/generate">POST /generate (recommended)</option>
+      <option value="/govern">POST /govern</option>
+    </select>
+    <label for="prompt" style="display:block; margin-top:0.75rem;">Prompt</label>
+    <textarea id="prompt" class="demo-input" rows="6" placeholder="Type a prompt to test CMIS behavior..."></textarea>
+    <div class="demo-actions">
+      <button id="runBtn" class="cta-btn" type="button">Run Test</button>
+      <button id="clearBtn" class="cta-btn button-secondary" type="button">Clear</button>
+    </div>
+  </div>
+
+  <div class="demo-grid">
+    <article class="demo-card">
+      <h3>Governance Decision</h3>
+      <div id="decisionPill" class="status-pill">PENDING</div>
+      <p class="hint" id="decisionMeta">Run a prompt to view decision, score, and trace.</p>
+      <pre id="logicPane" class="output">Awaiting request...</pre>
+    </article>
+
+    <article class="demo-card">
+      <h3>Model Pane</h3>
+      <p class="hint">Raw pre-gate model interception is not exposed by current API contract.</p>
+      <pre id="modelPane" class="output">No model output yet.</pre>
+    </article>
+
+    <article class="demo-card">
+      <h3>Full JSON Response</h3>
+      <pre id="jsonPane" class="output">Awaiting request...</pre>
+    </article>
+  </div>
+</section>
+</main>
+
+<script>
+const decisionPill = document.getElementById('decisionPill');
+const decisionMeta = document.getElementById('decisionMeta');
+const logicPane = document.getElementById('logicPane');
+const modelPane = document.getElementById('modelPane');
+const jsonPane = document.getElementById('jsonPane');
+const runBtn = document.getElementById('runBtn');
+const clearBtn = document.getElementById('clearBtn');
+
+function normalizeMessage(data) {
+  if (!data || typeof data !== 'object') return 'No message available.';
+  return data.model_response || data.response || data.message || 'No model payload in this response.';
+}
+
+function setDecision(decision) {
+  decisionPill.className = 'status-pill';
+  if (decision === 'ALLOW') {
+    decisionPill.classList.add('allow');
+  } else if (decision === 'REFUSE') {
+    decisionPill.classList.add('refuse');
+  }
+  decisionPill.textContent = decision || 'UNKNOWN';
+}
+
+async function runDemo() {
+  const prompt = document.getElementById('prompt').value.trim();
+  const endpoint = document.getElementById('endpoint').value;
+  if (!prompt) {
+    alert('Please enter a prompt.');
+    return;
+  }
+
+  setDecision('RUNNING');
+  decisionMeta.textContent = 'Submitting request...';
+  logicPane.textContent = 'Evaluating governance...';
+  modelPane.textContent = 'Waiting for endpoint response...';
+  jsonPane.textContent = 'Loading...';
+
+  try {
+    const resp = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt })
+    });
+
+    const payload = await resp.json();
+    const decision = payload.decision || (payload.status === 'blocked' ? 'REFUSE' : 'UNKNOWN');
+    setDecision(decision);
+
+    const score = payload.score !== undefined ? payload.score : 'n/a';
+    const traceId = payload.trace_id || 'n/a';
+    const reason = payload.reason || payload.message || 'n/a';
+    decisionMeta.textContent = 'Endpoint: ' + endpoint + ' | Score: ' + score + ' | Trace: ' + traceId;
+
+    logicPane.textContent = [
+      'decision: ' + decision,
+      'score: ' + score,
+      'trace_id: ' + traceId,
+      'reason/message: ' + reason,
+      'http_status: ' + resp.status
+    ].join('\n');
+
+    if (decision === 'ALLOW') {
+      modelPane.textContent = normalizeMessage(payload);
+    } else {
+      modelPane.textContent = 'Request blocked or denied.\n\nCurrent backend does not expose a raw pre-governance draft.';
+    }
+
+    jsonPane.textContent = JSON.stringify(payload, null, 2);
+  } catch (err) {
+    setDecision('ERROR');
+    decisionMeta.textContent = 'Request failed';
+    logicPane.textContent = 'Network or backend error. Confirm server is running.';
+    modelPane.textContent = String(err);
+    jsonPane.textContent = String(err);
+  }
+}
+
+runBtn.addEventListener('click', runDemo);
+clearBtn.addEventListener('click', () => {
+  document.getElementById('prompt').value = '';
+  setDecision('PENDING');
+  decisionMeta.textContent = 'Run a prompt to view decision, score, and trace.';
+  logicPane.textContent = 'Awaiting request...';
+  modelPane.textContent = 'No model output yet.';
+  jsonPane.textContent = 'Awaiting request...';
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,8 @@
+[
+  {
+    "role": "user",
+    "content": [
+      { "text": "Reply with OK only." }
+    ]
+  }
+]

@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="description" content="Contact Symbiotic AI for investor inquiries, system overviews, and benchmark walkthroughs." />
+<meta property="og:title" content="Symbiotic AI - Contact" />
+<meta property="og:description" content="Request the investor deck, benchmark overview, or a live demo." />
+<meta property="og:type" content="website" />
+<meta name="twitter:card" content="summary" />
+<link rel="icon" href="favicon.svg" type="image/svg+xml" />
+<link rel="stylesheet" href="styles.css">
+<title>Symbiotic AI - Contact</title>
+</head>
+<body>
+<header>
+  <h1>SYMBIOTIC AI</h1>
+  <p class="tagline">Investor Contact and System Overview Requests</p>
+  <nav aria-label="Primary">
+    <a href="index.html">Home</a>
+    <a href="about.html">About</a>
+    <a href="technology.html">Technology</a>
+    <a href="founder.html">Founder</a>
+    <a href="demo.html">Demo</a>
+    <a href="demo-live.html">Live Demo</a>
+    <a href="benchmarks.html">Benchmarks</a>
+    <a href="docs/index.html">Docs</a>
+    <a href="contact.html">Contact</a>
+  </nav>
+</header>
+
+<main>
+  <section class="hero">
+    <div class="hero-copy">
+      <p class="eyebrow">Contact</p>
+      <h2>Request a Live Demo or Investor Deck.</h2>
+      <p>
+        Use this form to request a system overview, benchmark review, or investor follow-up. Field-level
+        validation runs in the browser, and the server endpoint applies a second validation pass when available.
+      </p>
+      <div class="hero-actions">
+        <a class="cta-btn" href="mailto:info@symbiotic-ai.tech">Email Directly</a>
+        <a class="cta-btn secondary" href="benchmarks.html">View Benchmarks</a>
+      </div>
+    </div>
+    <div class="hero-panel">
+      <div class="hero-stat">
+        <span>Response Path</span>
+        <strong>Validated Inquiry</strong>
+      </div>
+      <div class="hero-stat">
+        <span>Delivery Options</span>
+        <strong>Email or API</strong>
+      </div>
+      <div class="hero-stat">
+        <span>Availability</span>
+        <strong>Investor Focused</strong>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Contact Form</h2>
+    <form class="contact-form" id="contact-form" novalidate>
+      <div class="field-grid">
+        <div class="form-field">
+          <label for="name">Name</label>
+          <input id="name" name="name" type="text" autocomplete="name" required minlength="2" />
+          <span class="field-error" id="name-error" aria-live="polite"></span>
+        </div>
+        <div class="form-field">
+          <label for="email">Email</label>
+          <input id="email" name="email" type="email" autocomplete="email" required />
+          <span class="field-error" id="email-error" aria-live="polite"></span>
+        </div>
+      </div>
+      <div class="field-grid">
+        <div class="form-field">
+          <label for="company">Company</label>
+          <input id="company" name="company" type="text" autocomplete="organization" required minlength="2" />
+          <span class="field-error" id="company-error" aria-live="polite"></span>
+        </div>
+        <div class="form-field">
+          <label for="topic">Topic</label>
+          <input id="topic" name="topic" type="text" placeholder="Investor deck, benchmark review, demo" required minlength="3" />
+          <span class="field-error" id="topic-error" aria-live="polite"></span>
+        </div>
+      </div>
+      <div class="form-field">
+        <label for="message">Message</label>
+        <textarea id="message" name="message" rows="6" required minlength="20" placeholder="Tell us what you want to review."></textarea>
+        <span class="field-error" id="message-error" aria-live="polite"></span>
+      </div>
+      <div class="form-status" id="form-status" aria-live="polite"></div>
+      <button class="cta-btn" type="submit">Send Request</button>
+    </form>
+  </section>
+</main>
+
+<footer class="site-footer">
+  <p>&copy; 2026 Symbiotic AI LLC</p>
+  <p>North Las Vegas, NV</p>
+  <p><a href="mailto:info@symbiotic-ai.tech">info@symbiotic-ai.tech</a></p>
+  <div class="footer-links">
+    <a href="about.html">About</a>
+    <a href="technology.html">Technology</a>
+    <a href="founder.html">Founder</a>
+  </div>
+  <p class="footer-meta">Governance-First AI Infrastructure</p>
+</footer>
+
+<script>
+const form = document.getElementById('contact-form');
+const statusBox = document.getElementById('form-status');
+const fieldOrder = ['name', 'email', 'company', 'topic', 'message'];
+
+function setError(fieldId, message) {
+  const errorBox = document.getElementById(`${fieldId}-error`);
+  const input = document.getElementById(fieldId);
+  if (errorBox) errorBox.textContent = message;
+  if (input) input.setAttribute('aria-invalid', message ? 'true' : 'false');
+}
+
+function validateField(fieldId) {
+  const input = document.getElementById(fieldId);
+  const value = (input.value || '').trim();
+  let error = '';
+
+  if (fieldId === 'email') {
+    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailPattern.test(value)) {
+      error = 'Enter a valid email address.';
+    }
+  } else if (fieldId === 'message') {
+    if (value.length < 20) {
+      error = 'Message must be at least 20 characters.';
+    }
+  } else if (value.length < 2) {
+    error = 'This field is required.';
+  }
+
+  setError(fieldId, error);
+  return !error;
+}
+
+fieldOrder.forEach((fieldId) => {
+  const input = document.getElementById(fieldId);
+  input.addEventListener('blur', () => validateField(fieldId));
+  input.addEventListener('input', () => {
+    if (document.getElementById(`${fieldId}-error`).textContent) {
+      validateField(fieldId);
+    }
+  });
+});
+
+form.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  statusBox.textContent = '';
+  statusBox.className = 'form-status';
+
+  const valid = fieldOrder.map(validateField).every(Boolean);
+  if (!valid) {
+    statusBox.textContent = 'Please correct the highlighted fields before submitting.';
+    statusBox.classList.add('error');
+    const firstInvalid = fieldOrder.find((fieldId) => document.getElementById(`${fieldId}-error`).textContent);
+    if (firstInvalid) {
+      document.getElementById(firstInvalid).focus();
+    }
+    return;
+  }
+
+  const payload = {
+    name: document.getElementById('name').value.trim(),
+    email: document.getElementById('email').value.trim(),
+    company: document.getElementById('company').value.trim(),
+    topic: document.getElementById('topic').value.trim(),
+    message: document.getElementById('message').value.trim(),
+  };
+
+  try {
+    const response = await fetch('/contact', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      const errorPayload = await response.json().catch(() => ({}));
+      throw new Error(errorPayload.detail?.message || 'Submission failed.');
+    }
+
+    statusBox.textContent = 'Request submitted successfully. We will respond shortly.';
+    statusBox.classList.add('success');
+    form.reset();
+    fieldOrder.forEach((fieldId) => setError(fieldId, ''));
+  } catch (error) {
+    statusBox.textContent = 'Form validation passed, but the API endpoint is unavailable. Opening email contact instead.';
+    statusBox.classList.add('error');
+    window.location.href = 'mailto:info@symbiotic-ai.tech?subject=Symbiotic%20AI%20Investor%20Inquiry';
+  }
+});
+</script>
+</body>
+</html>
