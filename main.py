@@ -26,6 +26,26 @@ COSMOS_DATABASE_NAME = os.getenv("COSMOS_DB_NAME", "cmis-database")
 COSMOS_CONTAINER_NAME = os.getenv("COSMOS_CONTAINER_NAME", "traces")
 MAX_PROMPT_LENGTH = int(os.getenv("MAX_PROMPT_LENGTH", "4000"))
 DEMO_MODE = os.getenv("CMIS_DEMO_MODE", "1").strip().lower() not in {"0", "false", "no", "off"}
+CMIS_POLICY_PROFILE = os.getenv("CMIS_POLICY_PROFILE", "DEMO" if DEMO_MODE else "SCHOOL").strip().upper()
+STRICT_MODE = os.getenv("CMIS_STRICT_MODE", "0").strip().lower() in {"1", "true", "yes", "on"}
+ALLOWED_POLICY_PROFILES = {"SCHOOL", "DEMO"}
+ALLOWED_DEBUG_MODES = {"STRICT", "STANDARD"}
+DEFAULT_POLICY_PROFILE = "SCHOOL"
+DEFAULT_DEBUG_MODE = "STRICT"
+
+UNSAFE_SIGNAL_KEYWORDS = {
+    "hack",
+    "exploit",
+    "malware",
+    "phishing",
+    "ddos",
+    "ransomware",
+    "intrusion",
+    "breach",
+    "bypass",
+    "steal",
+    "credential",
+}
 
 
 def validate_aws_startup() -> None:
@@ -120,6 +140,12 @@ class PromptRequest(BaseModel):
     prompt: str
 
 
+class DebugGovernanceRequest(BaseModel):
+    prompt: str
+    policy_profile: str = DEFAULT_POLICY_PROFILE
+    mode: str = DEFAULT_DEBUG_MODE
+
+
 class ContactRequest(BaseModel):
     name: str
     email: str
@@ -156,23 +182,117 @@ def validate_prompt(prompt: str) -> str:
     return normalized
 
 
-def CanonicalGovernanceGate(prompt: str) -> dict[str, Any]:
-    score = len(prompt) / 500
-    trace_seed = f"{CONSTITUTION_HASH}:{prompt}:{time.time()}"
+def extract_signals(prompt: str) -> list[str]:
+    lowered = prompt.lower()
+    signals = sorted([word for word in UNSAFE_SIGNAL_KEYWORDS if word in lowered])
+    return signals
+
+
+def unsafe_signals_detected(signals: list[str]) -> bool:
+    return len(signals) > 0
+
+
+def classify_prompt(signals: list[str]) -> str:
+    if not signals:
+        return "general"
+
+    if any(word in signals for word in {"hack", "exploit", "intrusion", "bypass", "malware", "phishing"}):
+        return "ethics"
+
+    return "conflict"
+
+
+def determine_scope(classification: str) -> str:
+    if classification in {"ethics", "conflict"}:
+        return "ethics_review"
+    return "standard"
+
+
+def load_active_policy_profile(profile_name: str = DEFAULT_POLICY_PROFILE) -> dict[str, Any]:
+    normalized_profile = profile_name.strip().upper()
+    if normalized_profile == "SCHOOL":
+        return {
+            "name": "SCHOOL",
+            "domain": "school",
+            "rules": ["network_intrusion_block", "student_safety_required"],
+        }
+
+    return {
+        "name": "DEMO",
+        "domain": "demo",
+        "rules": ["network_intrusion_block"],
+    }
+
+
+def enforce_constraints(envelope: dict[str, Any]) -> dict[str, Any]:
+    violations: list[str] = []
+    if unsafe_signals_detected(envelope["signals"]):
+        violations.append("UnsafeSignalsDetected")
+
+    if envelope["score"] > THRESHOLD:
+        violations.append("ThresholdExceeded")
+
+    envelope["violations"] = violations
+    if violations:
+        envelope["decision"] = "REFUSE"
+        envelope["reason"] = violations[0]
+
+    return envelope
+
+
+def CMIS_ANALYZE(prompt: str, deterministic: bool = False, policy_profile: str = DEFAULT_POLICY_PROFILE) -> dict[str, Any]:
+    score = round(len(prompt) / 500, 3)
+    profile_name = policy_profile.strip().upper()
+    if deterministic:
+        trace_seed = f"{CONSTITUTION_HASH}:{profile_name}:{prompt}:STRICT"
+    else:
+        trace_seed = f"{CONSTITUTION_HASH}:{prompt}:{time.time()}"
     trace_id = hashlib.sha256(trace_seed.encode()).hexdigest()[:12]
 
-    if score > THRESHOLD:
+    signals = extract_signals(prompt)
+    classification = classify_prompt(signals)
+    scope = determine_scope(classification)
+    confidence = 0.95 if signals else 0.72
+
+    envelope: dict[str, Any] = {
+        "trace_id": trace_id,
+        "score": score,
+        "decision": "ALLOW",
+        "classification": classification,
+        "scope": scope,
+        "confidence": confidence,
+        "signals": signals,
+        "violations": [],
+        "reason": None,
+    }
+
+    return enforce_constraints(envelope)
+
+
+def CanonicalGovernanceGate(prompt: str) -> dict[str, Any]:
+    state = CMIS_ANALYZE(prompt)
+    if state["decision"] == "REFUSE":
         return {
             "decision": "REFUSE",
-            "trace_id": trace_id,
-            "score": round(score, 3),
-            "reason": "ThresholdExceeded",
+            "trace_id": state["trace_id"],
+            "score": state["score"],
+            "reason": state.get("reason") or "GovernanceBlocked",
+            "classification": state["classification"],
+            "scope": state["scope"],
+            "confidence": state["confidence"],
+            "signals": state["signals"],
+            "violations": state["violations"],
         }
 
     return {
         "decision": "ALLOW",
-        "trace_id": trace_id,
-        "score": round(score, 3),
+        "trace_id": state["trace_id"],
+        "score": state["score"],
+        "classification": state["classification"],
+        "scope": state["scope"],
+        "confidence": state["confidence"],
+        "signals": state["signals"],
+        "violations": state["violations"],
     }
 
 
@@ -341,7 +461,7 @@ async def governed_generation(request: PromptRequest):
             "message": "Request denied under constitutional constraints.",
         }
 
-    if DEMO_MODE:
+    if DEMO_MODE and not STRICT_MODE:
         demo_response = build_demo_allow_response(prompt, state["trace_id"])
         save_cmis_trace(
             prompt=prompt,
@@ -448,7 +568,7 @@ def govern(request: PromptRequest):
             "message": "Request denied under constitutional constraints.",
         }
 
-    if DEMO_MODE:
+    if DEMO_MODE and not STRICT_MODE:
         demo_response = build_demo_allow_response(prompt, state["trace_id"])
         save_cmis_trace(
             prompt=prompt,
@@ -571,4 +691,80 @@ def submit_contact(request: ContactRequest):
     return {
         "status": "received",
         "message": "Contact request accepted.",
+    }
+
+
+@app.post("/debug/governance")
+def debug_governance_decision(request: DebugGovernanceRequest):
+    prompt = validate_prompt(request.prompt)
+    mode = (request.mode or DEFAULT_DEBUG_MODE).strip().upper()
+    if mode not in ALLOWED_DEBUG_MODES:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "error": "InvalidDebugMode",
+                "message": f"mode must be one of {sorted(ALLOWED_DEBUG_MODES)}",
+            },
+        )
+
+    strict_mode = mode == "STRICT"
+    requested_profile = (request.policy_profile or DEFAULT_POLICY_PROFILE).strip().upper()
+    if requested_profile not in ALLOWED_POLICY_PROFILES:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "error": "InvalidPolicyProfile",
+                "message": f"policy_profile must be one of {sorted(ALLOWED_POLICY_PROFILES)}",
+            },
+        )
+
+    envelope = CMIS_ANALYZE(
+        prompt,
+        deterministic=strict_mode,
+        policy_profile=requested_profile,
+    )
+    active_policy = load_active_policy_profile(requested_profile)
+
+    debug_messages: list[str] = []
+
+    if "hack" in prompt.lower() and "hack" not in envelope["signals"]:
+        debug_messages.append("ISSUE: Keyword 'hack' not detected in signals.")
+
+    if not unsafe_signals_detected(envelope["signals"]):
+        debug_messages.append("ISSUE: unsafe_signals_detected() returned FALSE.")
+
+    if envelope["classification"] is None:
+        debug_messages.append("ISSUE: classification returned NULL.")
+
+    if envelope["classification"] not in ["conflict", "ethics"]:
+        debug_messages.append("ISSUE: Prompt not classified as safety-sensitive.")
+
+    if envelope["scope"] != "ethics_review":
+        debug_messages.append("ISSUE: Scope not escalated to ethics_review.")
+
+    if len(envelope["violations"]) == 0:
+        debug_messages.append("ISSUE: No violations triggered during enforce_constraints.")
+
+    if active_policy["name"] == "DEMO":
+        debug_messages.append("ISSUE: Demo mode may bypass refusal rules.")
+
+    if active_policy["domain"] == "school" and "network_intrusion_block" not in active_policy["rules"]:
+        debug_messages.append("ISSUE: School policy missing network intrusion rule.")
+
+    if len(envelope["violations"]) == 0:
+        debug_messages.append("ALLOW default path: violations list is empty.")
+
+    return {
+        "decision": envelope["decision"],
+        "classification": envelope["classification"],
+        "scope": envelope["scope"],
+        "confidence": envelope["confidence"],
+        "signals": envelope["signals"],
+        "violations": envelope["violations"],
+        "trace": envelope["trace_id"],
+        "mode": mode,
+        "strict_enforced": strict_mode,
+        "policy_profile": requested_profile,
+        "active_policy": active_policy,
+        "debug_messages": debug_messages,
     }

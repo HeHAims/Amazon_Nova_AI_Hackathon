@@ -115,6 +115,9 @@
         const statusColor = decision === 'ALLOW' ? 'text-green-400' : 'text-red-500';
         const score = data.score !== undefined ? data.score : 'n/a';
         const traceId = data.trace_id || 'n/a';
+        const runtimeLabel = data.demo_mode
+          ? '<p class="text-[11px] font-mono text-yellow-400">> Runtime: DEMO MODE (mock generation path)</p>'
+          : '<p class="text-[11px] font-mono text-gray-500">> Runtime: LIVE MODE</p>';
 
         if (decision === 'ALLOW') {
           document.getElementById('pane-raw').innerText = getOutputText(data);
@@ -132,6 +135,7 @@
             <p>> Trace ID: ${traceId}</p>
             <p>> Mode Label: ${currentMode === 'nova' ? 'Amazon Nova Track' : 'Enterprise TRiSM'}</p>
             <p>> HTTP Status: ${response.status}</p>
+            ${runtimeLabel}
           </div>
         `;
 
@@ -143,7 +147,16 @@
             </div>
           `;
         } else {
-          document.getElementById('pane-final').innerText = getOutputText(data);
+          if (data.demo_mode) {
+            document.getElementById('pane-final').innerHTML = `
+              <div class="text-yellow-400 border border-yellow-900 p-2 rounded bg-yellow-900/10 mb-3">
+                <strong>Demo Mode Active:</strong> output below is mock-generated after governance approval.
+              </div>
+              <div>${getOutputText(data)}</div>
+            `;
+          } else {
+            document.getElementById('pane-final').innerText = getOutputText(data);
+          }
         }
         if (data.trace_id) {
           document.getElementById('trace-id').innerText = data.trace_id.substring(0, 8);
